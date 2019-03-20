@@ -23,7 +23,9 @@
 #include <string>
 #include <cstdio>
 
+#ifndef ANDROID
 #include <execinfo.h>
+#endif
 #include <cxxabi.h>
 
 #include <cstring>

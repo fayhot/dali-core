@@ -1,6 +1,5 @@
 #ifndef DALI_INTEGRATION_CORE_H
 #define DALI_INTEGRATION_CORE_H
-
 /*
  * Copyright (c) 2019 Samsung Electronics Co., Ltd.
  *
