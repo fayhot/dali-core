@@ -684,8 +684,9 @@ void Program::Load()
           GLint  binaryLength = 0;
           GLenum binaryFormat;
           DALI_LOG_INFO( Debug::Filter::gShader, Debug::General, "Compiled and linked.\n\nVS:\n%s\nFS:\n%s\n", mProgramData->GetVertexShader(), mProgramData->GetFragmentShader() );
-
+#ifndef ANDROID
           CHECK_GL( mGlAbstraction, mGlAbstraction.GetProgramiv(mProgramId, GL_PROGRAM_BINARY_LENGTH_OES, &binaryLength) );
+#endif
           DALI_LOG_INFO(Debug::Filter::gShader, Debug::General, "Program::Load() - GL_PROGRAM_BINARY_LENGTH_OES: %d\n", binaryLength);
           if( binaryLength > 0 )
           {
