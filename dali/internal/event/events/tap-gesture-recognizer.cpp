@@ -38,7 +38,12 @@ namespace Internal
 namespace
 {
 // TODO: Set these according to DPI
+#ifndef ANDROID
 const float MAXIMUM_MOTION_ALLOWED = 20.0f;
+#else
+const float MAXIMUM_MOTION_ALLOWED = 120.0f;
+#endif
+
 const unsigned long MAXIMUM_TIME_ALLOWED = 500u;
 } // unnamed namespace
 
