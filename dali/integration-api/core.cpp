@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019 Samsung Electronics Co., Ltd.
+ * Copyright (c) 2020 Samsung Electronics Co., Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -40,7 +40,6 @@ Core* Core::New( RenderController& renderController,
                  GlAbstraction& glAbstraction,
                  GlSyncAbstraction& glSyncAbstraction,
                  GlContextHelperAbstraction& glContextHelperAbstraction,
-                 ResourcePolicy::DataRetention policy,
                  RenderToFrameBuffer renderToFboEnabled,
                  DepthBufferAvailable depthBufferAvailable,
                  StencilBufferAvailable stencilBufferAvailable )
@@ -51,7 +50,6 @@ Core* Core::New( RenderController& renderController,
                                         glAbstraction,
                                         glSyncAbstraction,
                                         glContextHelperAbstraction,
-                                        policy,
                                         renderToFboEnabled,
                                         depthBufferAvailable,
                                         stencilBufferAvailable );
@@ -89,11 +87,6 @@ void Core::RecoverFromContextLoss()
   mImpl->RecoverFromContextLoss();
 }
 
-void Core::SurfaceResized( Integration::RenderSurface* surface )
-{
-  mImpl->SurfaceResized(surface);
-}
-
 void Core::SurfaceDeleted( Integration::RenderSurface* surface )
 {
   mImpl->SurfaceDeleted(surface);
@@ -124,9 +117,9 @@ void Core::Update( float elapsedSeconds, uint32_t lastVSyncTimeMilliseconds, uin
   mImpl->Update( elapsedSeconds, lastVSyncTimeMilliseconds, nextVSyncTimeMilliseconds, status, renderToFboEnabled, isRenderingToFbo );
 }
 
-void Core::Render( RenderStatus& status, bool forceClear )
+void Core::Render( RenderStatus& status, bool forceClear, bool uploadOnly )
 {
-  mImpl->Render( status, forceClear );
+  mImpl->Render( status, forceClear, uploadOnly );
 }
 
 void Core::RegisterProcessor( Processor& processor )

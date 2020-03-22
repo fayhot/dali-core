@@ -29,9 +29,9 @@ namespace Dali
 namespace Integration
 {
 
-Scene Scene::New( const Size& size )
+Scene Scene::New( Integration::RenderSurface& surface )
 {
-  Internal::ScenePtr internal = Internal::Scene::New( size );
+  Internal::ScenePtr internal = Internal::Scene::New( surface );
   return Scene( internal.Get() );
 }
 
@@ -124,6 +124,11 @@ void Scene::SetSurface( Integration::RenderSurface& surface )
   GetImplementation(*this).SetSurface( surface );
 }
 
+void Scene::SurfaceResized()
+{
+  GetImplementation( *this ).SurfaceResized();
+}
+
 Integration::RenderSurface* Scene::GetSurface() const
 {
   return GetImplementation(*this).GetSurface();
@@ -157,6 +162,11 @@ Scene::EventProcessingFinishedSignalType& Scene::EventProcessingFinishedSignal()
 Scene::KeyEventSignalType& Scene::KeyEventSignal()
 {
   return GetImplementation(*this).KeyEventSignal();
+}
+
+Scene::KeyEventGeneratedSignalType& Scene::KeyEventGeneratedSignal()
+{
+  return GetImplementation(*this).KeyEventGeneratedSignal();
 }
 
 Scene::TouchSignalType& Scene::TouchSignal()

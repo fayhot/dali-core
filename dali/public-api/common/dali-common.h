@@ -2,7 +2,7 @@
 #define DALI_COMMON_H
 
 /*
- * Copyright (c) 2019 Samsung Electronics Co., Ltd.
+ * Copyright (c) 2020 Samsung Electronics Co., Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,9 +23,9 @@
 /*
  * Definitions for shared library support.
  *
- * If a library is configured with --enable-exportall or --enable-debug
+ * If a library is built with -DENABLE_EXPORTALL=ON or -DENABLE_DEBUG=ON
  * then HIDE_DALI_INTERNALS is not defined, and nothing is hidden.
- * If it is configured without these options (the default), then HIDE_INTERNALS
+ * If it is built without these options (the default), then HIDE_INTERNALS
  * is defined when building the library, visibility is automatically hidden, and the explicit
  * defines below come into use.
  * When building a library that uses DALI, HIDE_DALI_INTERNALS.
@@ -169,7 +169,11 @@ public:
  * @SINCE_1_0.0
  */
 #if defined(DEBUG_ENABLED)
+#if defined(WIN32)
+#define ASSERT_LOCATION __FUNCSIG__
+#else
 #define ASSERT_LOCATION __PRETTY_FUNCTION__
+#endif
 #else
 #define ASSERT_LOCATION NULL
 #endif
@@ -197,6 +201,15 @@ public:
 #define DALI_ASSERT_DEBUG(cond) DALI_ASSERT_ALWAYS(cond)
 #else
 #define DALI_ASSERT_DEBUG(cond)
+#endif
+
+/// Use DALI_FALLTHROUGH in switch statements where one case is supposed to fall through into another case
+#define DALI_FALLTHROUGH
+#if __GNUC__
+#if __has_cpp_attribute(fallthrough)
+#undef DALI_FALLTHROUGH
+#define DALI_FALLTHROUGH [[fallthrough]]
+#endif
 #endif
 
 #endif // DALI_COMMON_H

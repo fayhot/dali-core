@@ -25,7 +25,7 @@
 // INTERNAL INCLUDES
 #include <dali/integration-api/render-controller.h>
 #include <dali/internal/event/common/stage-impl.h>
-#include <dali/internal/event/events/pinch-gesture-detector-impl.h>
+#include <dali/internal/event/events/pinch-gesture/pinch-gesture-detector-impl.h>
 #include <dali/internal/update/gestures/scene-graph-pan-gesture.h>
 #include <dali/public-api/events/pan-gesture.h>
 #include <dali/integration-api/debug.h>
@@ -41,6 +41,7 @@ GestureEventProcessor::GestureEventProcessor( SceneGraph::UpdateManager& updateM
   mPanGestureProcessor( updateManager ),
   mPinchGestureProcessor(),
   mTapGestureProcessor(),
+  mRotationGestureProcessor(),
   mRenderController( renderController ),
   envOptionMinimumPanDistance(-1),
   envOptionMinimumPanEvents(-1)
@@ -57,37 +58,45 @@ void GestureEventProcessor::ProcessTouchEvent( Scene& scene, const Integration::
   mPanGestureProcessor.ProcessTouch(scene, event);
   mPinchGestureProcessor.ProcessTouch(scene, event);
   mTapGestureProcessor.ProcessTouch(scene, event);
+  mRotationGestureProcessor.ProcessTouch(scene, event);
 }
 
 void GestureEventProcessor::AddGestureDetector(GestureDetector* gestureDetector, Scene& scene)
 {
   switch (gestureDetector->GetType())
   {
-    case Gesture::LongPress:
+    case DevelGesture::LongPress:
     {
       LongPressGestureDetector* longPress = static_cast<LongPressGestureDetector*>(gestureDetector);
       mLongPressGestureProcessor.AddGestureDetector(longPress, scene);
       break;
     }
 
-    case Gesture::Pan:
+    case DevelGesture::Pan:
     {
       PanGestureDetector* pan = static_cast<PanGestureDetector*>(gestureDetector);
       mPanGestureProcessor.AddGestureDetector(pan, scene, envOptionMinimumPanDistance, envOptionMinimumPanEvents);
       break;
     }
 
-    case Gesture::Pinch:
+    case DevelGesture::Pinch:
     {
       PinchGestureDetector* pinch = static_cast<PinchGestureDetector*>(gestureDetector);
       mPinchGestureProcessor.AddGestureDetector(pinch, scene);
       break;
     }
 
-    case Gesture::Tap:
+    case DevelGesture::Tap:
     {
       TapGestureDetector* tap = static_cast<TapGestureDetector*>(gestureDetector);
       mTapGestureProcessor.AddGestureDetector(tap, scene);
+      break;
+    }
+
+    case DevelGesture::Rotation:
+    {
+      RotationGestureDetector* rotation = static_cast<RotationGestureDetector*>(gestureDetector);
+      mRotationGestureProcessor.AddGestureDetector(rotation, scene);
       break;
     }
   }
@@ -97,31 +106,38 @@ void GestureEventProcessor::RemoveGestureDetector(GestureDetector* gestureDetect
 {
   switch (gestureDetector->GetType())
   {
-    case Gesture::LongPress:
+    case DevelGesture::LongPress:
     {
       LongPressGestureDetector* longPress = static_cast<LongPressGestureDetector*>(gestureDetector);
       mLongPressGestureProcessor.RemoveGestureDetector(longPress);
       break;
     }
 
-    case Gesture::Pan:
+    case DevelGesture::Pan:
     {
       PanGestureDetector* pan = static_cast<PanGestureDetector*>(gestureDetector);
       mPanGestureProcessor.RemoveGestureDetector(pan);
       break;
     }
 
-    case Gesture::Pinch:
+    case DevelGesture::Pinch:
     {
       PinchGestureDetector* pinch = static_cast<PinchGestureDetector*>(gestureDetector);
       mPinchGestureProcessor.RemoveGestureDetector(pinch);
       break;
     }
 
-    case Gesture::Tap:
+    case DevelGesture::Tap:
     {
       TapGestureDetector* tap = static_cast<TapGestureDetector*>(gestureDetector);
       mTapGestureProcessor.RemoveGestureDetector(tap);
+      break;
+    }
+
+    case DevelGesture::Rotation:
+    {
+      RotationGestureDetector* rotation = static_cast<RotationGestureDetector*>(gestureDetector);
+      mRotationGestureProcessor.RemoveGestureDetector(rotation);
       break;
     }
   }
@@ -131,31 +147,37 @@ void GestureEventProcessor::GestureDetectorUpdated(GestureDetector* gestureDetec
 {
   switch (gestureDetector->GetType())
   {
-    case Gesture::LongPress:
+    case DevelGesture::LongPress:
     {
       LongPressGestureDetector* longPress = static_cast<LongPressGestureDetector*>(gestureDetector);
       mLongPressGestureProcessor.GestureDetectorUpdated(longPress);
       break;
     }
 
-    case Gesture::Pan:
+    case DevelGesture::Pan:
     {
       PanGestureDetector* pan = static_cast<PanGestureDetector*>(gestureDetector);
       mPanGestureProcessor.GestureDetectorUpdated(pan);
       break;
     }
 
-    case Gesture::Pinch:
+    case DevelGesture::Pinch:
     {
       PinchGestureDetector* pinch = static_cast<PinchGestureDetector*>(gestureDetector);
       mPinchGestureProcessor.GestureDetectorUpdated(pinch);
       break;
     }
 
-    case Gesture::Tap:
+    case DevelGesture::Tap:
     {
       TapGestureDetector* tap = static_cast<TapGestureDetector*>(gestureDetector);
       mTapGestureProcessor.GestureDetectorUpdated(tap);
+      break;
+    }
+
+    case DevelGesture::Rotation:
+    {
+      // Nothing to do
       break;
     }
   }
@@ -165,18 +187,19 @@ void GestureEventProcessor::SetGestureProperties( const Gesture& gesture )
 {
   bool requestUpdate = false;
 
-  switch ( gesture.type )
+  switch ( static_cast< DevelGesture::Type >( gesture.type ) )
   {
-    case Gesture::Pan:
+    case DevelGesture::Pan:
     {
       const PanGesture& pan = static_cast< const PanGesture& >( gesture );
       requestUpdate = mPanGestureProcessor.SetPanGestureProperties( pan );
       break;
     }
 
-    case Gesture::LongPress:
-    case Gesture::Pinch:
-    case Gesture::Tap:
+    case DevelGesture::LongPress:
+    case DevelGesture::Pinch:
+    case DevelGesture::Tap:
+    case DevelGesture::Rotation:
     {
       DALI_ASSERT_DEBUG( false && "Gesture type does not have scene object\n" );
       break;
@@ -198,6 +221,7 @@ bool GestureEventProcessor::NeedsUpdate()
   updateRequired |= mPanGestureProcessor.NeedsUpdate();
   updateRequired |= mPinchGestureProcessor.NeedsUpdate();
   updateRequired |= mTapGestureProcessor.NeedsUpdate();
+  updateRequired |= mRotationGestureProcessor.NeedsUpdate();
 
   return updateRequired;
 }
@@ -295,6 +319,36 @@ void GestureEventProcessor::SetPanGestureMinimumPanEvents( int32_t value )
 void GestureEventProcessor::SetPinchGestureMinimumDistance( float value)
 {
   mPinchGestureProcessor.SetMinimumPinchDistance( value );
+}
+
+void GestureEventProcessor::SetPinchGestureMinimumTouchEvents( uint32_t value )
+{
+  mPinchGestureProcessor.SetMinimumTouchEvents( value );
+}
+
+void GestureEventProcessor::SetPinchGestureMinimumTouchEventsAfterStart( uint32_t value )
+{
+  mPinchGestureProcessor.SetMinimumTouchEventsAfterStart( value );
+}
+
+void GestureEventProcessor::SetRotationGestureMinimumTouchEvents( uint32_t value )
+{
+  mRotationGestureProcessor.SetMinimumTouchEvents( value );
+}
+
+void GestureEventProcessor::SetRotationGestureMinimumTouchEventsAfterStart( uint32_t value )
+{
+  mRotationGestureProcessor.SetMinimumTouchEventsAfterStart( value );
+}
+
+void GestureEventProcessor::SetLongPressMinimumHoldingTime( uint32_t value )
+{
+  mLongPressGestureProcessor.SetMinimumHoldingTime( value );
+}
+
+uint32_t GestureEventProcessor::GetLongPressMinimumHoldingTime() const
+{
+  return mLongPressGestureProcessor.GetMinimumHoldingTime();
 }
 
 const PanGestureProcessor& GestureEventProcessor::GetPanGestureProcessor()

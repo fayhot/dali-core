@@ -35,8 +35,6 @@ namespace Internal
 namespace
 {
 
-static Matrix gModelViewProjectionMatrix( false ); ///< a shared matrix to calculate the MVP matrix, dont want to store it in object to reduce storage overhead
-static Matrix3 gNormalMatrix; ///< a shared matrix to calculate normal matrix, dont want to store it in object to reduce storage overhead
 
 /**
  * Helper to set view and projection matrices once per program
@@ -86,17 +84,19 @@ inline void SetMatrices( Program& program,
   loc = program.GetUniformLocation( Program::UNIFORM_MVP_MATRIX );
   if( Program::UNIFORM_UNKNOWN != loc )
   {
-    Matrix::Multiply( gModelViewProjectionMatrix, modelViewMatrix, projectionMatrix );
-    program.SetUniformMatrix4fv( loc, 1, gModelViewProjectionMatrix.AsFloat() );
+    Matrix modelViewProjectionMatrix(false);
+    Matrix::Multiply( modelViewProjectionMatrix, modelViewMatrix, projectionMatrix );
+    program.SetUniformMatrix4fv( loc, 1, modelViewProjectionMatrix.AsFloat() );
   }
 
   loc = program.GetUniformLocation( Program::UNIFORM_NORMAL_MATRIX );
   if( Program::UNIFORM_UNKNOWN != loc )
   {
-    gNormalMatrix = modelViewMatrix;
-    gNormalMatrix.Invert();
-    gNormalMatrix.Transpose();
-    program.SetUniformMatrix3fv( loc, 1, gNormalMatrix.AsFloat() );
+    Matrix3 normalMatrix;
+    normalMatrix = modelViewMatrix;
+    normalMatrix.Invert();
+    normalMatrix.Transpose();
+    program.SetUniformMatrix3fv( loc, 1, normalMatrix.AsFloat() );
   }
 }
 
@@ -145,7 +145,8 @@ Renderer::Renderer( SceneGraph::RenderDataProvider* dataProvider,
   mDepthWriteMode( depthWriteMode ),
   mDepthTestMode( depthTestMode ),
   mUpdateAttributesLocation( true ),
-  mPremultipledAlphaEnabled( preMultipliedAlphaEnabled )
+  mPremultipledAlphaEnabled( preMultipliedAlphaEnabled ),
+  mShaderChanged( false )
 {
   if( blendingBitmask != 0u )
   {
@@ -216,8 +217,12 @@ void Renderer::SetUniforms( BufferIndex bufferIndex, const SceneGraph::NodeDataP
 
   if( uniformMapDataProvider.GetUniformMapChanged( bufferIndex ) ||
       node.GetUniformMapChanged(bufferIndex) ||
-      mUniformIndexMap.Count() == 0)
+      mUniformIndexMap.Count() == 0 ||
+      mShaderChanged )
   {
+    // Reset shader pointer
+    mShaderChanged = false;
+
     const SceneGraph::CollectedUniformMap& uniformMap = uniformMapDataProvider.GetUniformMap( bufferIndex );
     const SceneGraph::CollectedUniformMap& uniformMapNode = node.GetUniformMap( bufferIndex );
 
@@ -584,6 +589,11 @@ void Renderer::SetSortAttributes( BufferIndex bufferIndex,
 {
   sortAttributes.shader = &( mRenderDataProvider->GetShader() );
   sortAttributes.geometry = mGeometry;
+}
+
+void Renderer::SetShaderChanged( bool value )
+{
+  mShaderChanged = value;
 }
 
 } // namespace SceneGraph

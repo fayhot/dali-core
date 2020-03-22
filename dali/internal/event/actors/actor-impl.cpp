@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 Samsung Electronics Co., Ltd.
+ * Copyright (c) 2020 Samsung Electronics Co., Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -1782,7 +1782,7 @@ ActorGestureData& Actor::GetGestureData()
   return *mGestureData;
 }
 
-bool Actor::IsGestureRequred( Gesture::Type type ) const
+bool Actor::IsGestureRequred( DevelGesture::Type type ) const
 {
   return mGestureData && mGestureData->IsGestureRequred( type );
 }
@@ -3472,6 +3472,15 @@ bool Actor::DoAction( BaseObject* object, const std::string& actionName, const P
   return done;
 }
 
+Rect<> Actor::CalculateScreenExtents( ) const
+{
+  auto screenPosition = GetCurrentScreenPosition();
+  Vector3 size = GetCurrentSize() * GetCurrentWorldScale();
+  Vector3 anchorPointOffSet = size * ( mPositionUsesAnchorPoint ? GetCurrentAnchorPoint() : AnchorPoint::TOP_LEFT );
+  Vector2 position = Vector2( screenPosition.x - anchorPointOffSet.x, screenPosition.y - anchorPointOffSet.y );
+  return { position.x, position.y, size.x, size.y };
+}
+
 bool Actor::GetCachedPropertyValue( Property::Index index, Property::Value& value ) const
 {
   bool valueSet = true;
@@ -4629,12 +4638,16 @@ void Actor::SetPreferredSize( const Vector2& size )
 {
   EnsureRelayoutData();
 
-  if( size.width > 0.0f )
+  // If valid width or height, then set the resize policy to FIXED
+  // A 0 width or height may also be required so if the resize policy has not been changed, i.e. is still set to DEFAULT,
+  // then change to FIXED as well
+
+  if( size.width > 0.0f || GetResizePolicy( Dimension::WIDTH ) == ResizePolicy::DEFAULT )
   {
     SetResizePolicy( ResizePolicy::FIXED, Dimension::WIDTH );
   }
 
-  if( size.height > 0.0f )
+  if( size.height > 0.0f || GetResizePolicy( Dimension::HEIGHT ) == ResizePolicy::DEFAULT )
   {
     SetResizePolicy( ResizePolicy::FIXED, Dimension::HEIGHT );
   }

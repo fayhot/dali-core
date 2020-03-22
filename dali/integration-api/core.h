@@ -2,7 +2,7 @@
 #define DALI_INTEGRATION_CORE_H
 
 /*
- * Copyright (c) 2019 Samsung Electronics Co., Ltd.
+ * Copyright (c) 2020 Samsung Electronics Co., Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,7 +25,6 @@
 #include <dali/public-api/common/dali-common.h>
 #include <dali/integration-api/context-notifier.h>
 #include <dali/integration-api/core-enumerations.h>
-#include <dali/integration-api/resource-policies.h>
 
 namespace Dali
 {
@@ -226,9 +225,6 @@ public:
    * @param[in] glAbstraction The interface providing OpenGL services.
    * @param[in] glSyncAbstraction The interface providing OpenGL sync objects.
    * @param[in] glContextHelperAbstraction The interface providing OpenGL context helper objects.
-   * @param[in] policy The data retention policy. This depends on application setting
-   * and platform support. Dali should honour this policy when deciding to discard
-   * intermediate resource data.
    * @param[in] renderToFboEnabled Whether rendering into the Frame Buffer Object is enabled.
    * @param[in] depthBufferAvailable Whether the depth buffer is available
    * @param[in] stencilBufferAvailable Whether the stencil buffer is available
@@ -239,7 +235,6 @@ public:
                     GlAbstraction& glAbstraction,
                     GlSyncAbstraction& glSyncAbstraction,
                     GlContextHelperAbstraction& glContextHelperAbstraction,
-                    ResourcePolicy::DataRetention policy,
                     RenderToFrameBuffer renderToFboEnabled,
                     DepthBufferAvailable depthBufferAvailable,
                     StencilBufferAvailable stencilBufferAvailable );
@@ -287,15 +282,6 @@ public:
    * Multi-threading note: this method should be called from the main thread
    */
   void RecoverFromContextLoss();
-
-  /**
-   * Notify the Core that the GL surface has been resized.
-   * This should be done at least once i.e. after the first call to ContextCreated().
-   * The Core will use the surface size for camera calculations, and to set the GL viewport.
-   * Multi-threading note: this method should be called from the main thread
-   * @param[in] surface The resized surface
-   */
-  void SurfaceResized( Integration::RenderSurface* surface );
 
   /**
    * Notify the Core that the GL surface has been deleted.
@@ -364,8 +350,9 @@ public:
    * @pre The GL context must have been created, and made current.
    * @param[out] status showing whether update is required to run.
    * @param[in] forceClear force the Clear on the framebuffer even if nothing is rendered.
+   * @param[in] uploadOnly uploadOnly Upload the resource only without rendering.
    */
-  void Render( RenderStatus& status, bool forceClear );
+  void Render( RenderStatus& status, bool forceClear, bool uploadOnly );
 
   /**
    * @brief Register a processor

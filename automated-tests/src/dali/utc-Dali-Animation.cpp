@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017 Samsung Electronics Co., Ltd.
+ * Copyright (c) 2019 Samsung Electronics Co., Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -42,6 +42,7 @@ namespace
 
 static const float ROTATION_EPSILON = 0.0001f;
 static const float VECTOR4_EPSILON = 0.0001f;
+static const float VECTOR3_EPSILON = 0.0001f;
 
 // Functor to test whether a Finish signal is emitted
 struct AnimationFinishCheck
@@ -815,7 +816,7 @@ int UtcDaliAnimationIsLoopingP(void)
   END_TEST;
 }
 
-int UtcDaliAnimationSetEndActioN(void)
+int UtcDaliAnimationSetEndActionN(void)
 {
   TestApplication application;
 
@@ -13308,6 +13309,222 @@ int UtcDaliAnimationAnimateBetweenInvalidParameters(void)
     keyframes.Add( 0.5f, Property::Value(Vector3( 1, 2, 3 ) ) );
     animation.AnimateBetween( Property( actor, Actor::Property::POSITION ), keyframes, TimePeriod(-1) );
   }, "Duration must be >=0" );
+
+  END_TEST;
+}
+
+namespace // Purposefully left this in the middle as the values in this namespace are only used for the subsequent two test cases
+{
+enum TestFunction
+{
+  STOP,
+  CLEAR
+};
+
+void CheckPropertyValuesWhenCallingAnimationMethod( TestFunction functionToTest, const char * testName )
+{
+  tet_printf( "Testing %s\n", testName );
+
+  // When an Animation::Stop() or Animation::Clear() is called, the event-side property needs to be updated appropriately
+  // This test checks that that is being done
+
+  const float durationSeconds( 1.0f );
+  unsigned int halfAnimationDuration( static_cast< unsigned int >( durationSeconds * 1000.0f * 0.5f ) );
+  const Vector3 originalPosition( Vector3::ZERO );
+  const Vector3 targetPosition( 10.0f, 10.0f, 10.0f );
+  const Vector3 halfWayToTarget( targetPosition * 0.5f );
+
+  struct ExpectedValue
+  {
+    Animation::EndAction endAction;
+    Vector3 expectedGetPropertyValue;
+  };
+
+  ExpectedValue expectedValueTable[] =
+  {
+   { Animation::Bake,      halfWayToTarget  }, // When baking, the current value is the final value.
+   { Animation::BakeFinal, targetPosition   }, // When BakeFinal, we should jump to the final value when clearing or stopping.
+   { Animation::Discard,   originalPosition }, // When discarding, we should jump back to the original value when clearing or stopping.
+  };
+  const auto expectedValueTableCount = sizeof( expectedValueTable ) / sizeof( ExpectedValue );
+
+  for( auto i = 0u; i < expectedValueTableCount; ++i  )
+  {
+    TestApplication application;
+
+    Actor actor = Actor::New();
+    Stage::GetCurrent().Add(actor);
+
+    // Build the animation
+    Animation animation = Animation::New( durationSeconds );
+    animation.SetEndAction( expectedValueTable[ i ].endAction );
+    animation.AnimateTo( Property( actor, Actor::Property::POSITION ), targetPosition, AlphaFunction::LINEAR );
+
+    // Start the animation
+    animation.Play();
+
+    application.SendNotification();
+    application.Render( halfAnimationDuration );
+
+    // Stop or Clear the animation early, both have the same effect
+    if( functionToTest == TestFunction::STOP )
+    {
+      animation.Stop();
+    }
+    else
+    {
+      animation.Clear();
+    }
+
+    // The event side property should be set the expected value immediately, the update side property will still only be halfway as we haven't run an update yet
+    DALI_TEST_EQUALS( actor.GetProperty( Actor::Property::POSITION ).Get< Vector3 >(), expectedValueTable[ i ].expectedGetPropertyValue, VECTOR3_EPSILON, TEST_LOCATION );
+    DALI_TEST_EQUALS( actor.GetCurrentProperty( Actor::Property::POSITION ).Get< Vector3 >(), halfWayToTarget, VECTOR3_EPSILON, TEST_LOCATION );
+
+    // After one frame, both values should match regardless of the End Action
+    application.SendNotification();
+    application.Render();
+
+    DALI_TEST_EQUALS( actor.GetProperty( Actor::Property::POSITION ).Get< Vector3 >(), expectedValueTable[ i ].expectedGetPropertyValue, VECTOR3_EPSILON, TEST_LOCATION );
+    DALI_TEST_EQUALS( actor.GetCurrentProperty( Actor::Property::POSITION ).Get< Vector3 >(), expectedValueTable[ i ].expectedGetPropertyValue, VECTOR3_EPSILON, TEST_LOCATION );
+  }
+}
+} // unnamed namespace
+
+int UtcDaliAnimationStopPropertyValue(void)
+{
+  CheckPropertyValuesWhenCallingAnimationMethod( TestFunction::STOP, "UtcDaliAnimationStopPropertyValue" );
+  END_TEST;
+}
+
+int UtcDaliAnimationClearPropertyValue(void)
+{
+  CheckPropertyValuesWhenCallingAnimationMethod( TestFunction::CLEAR, "UtcDaliAnimationStopPropertyValue" );
+  END_TEST;
+}
+
+int UtcDaliAnimationPausePropertyValue(void)
+{
+  const float durationSeconds( 1.0f );
+  unsigned int halfAnimationDuration( static_cast< unsigned int >( durationSeconds * 1000.0f * 0.5f ) );
+  const Vector3 originalPosition( Vector3::ZERO );
+  const Vector3 targetPosition( 10.0f, 10.0f, 10.0f );
+  const Vector3 halfWayToTarget( targetPosition * 0.5f );
+
+  Animation::EndAction endActions[] =
+  {
+   Animation::Bake,
+   Animation::BakeFinal,
+   Animation::Discard,
+  };
+  const auto endActionCount = sizeof( endActions ) / sizeof( endActions[0] );
+
+  // For all end actions, when pausing, we stay at the current value
+  for( auto i = 0u; i < endActionCount; ++i  )
+  {
+    TestApplication application;
+
+    Actor actor = Actor::New();
+    Stage::GetCurrent().Add(actor);
+
+    // Build the animation
+    Animation animation = Animation::New( durationSeconds );
+    animation.SetEndAction( endActions[ i ] );
+    animation.AnimateTo( Property( actor, Actor::Property::POSITION ), targetPosition, AlphaFunction::LINEAR );
+
+    // Start the animation
+    animation.Play();
+
+    application.SendNotification();
+    application.Render( halfAnimationDuration );
+
+    // Puase the animation early
+    animation.Pause();
+
+    // The event side property should be set the current value immediately, the update side property will still only be halfway
+    DALI_TEST_EQUALS( actor.GetProperty( Actor::Property::POSITION ).Get< Vector3 >(), halfWayToTarget, VECTOR3_EPSILON, TEST_LOCATION );
+    DALI_TEST_EQUALS( actor.GetCurrentProperty( Actor::Property::POSITION ).Get< Vector3 >(), halfWayToTarget, VECTOR3_EPSILON, TEST_LOCATION );
+
+    // After one frame, both values should match regardless of the End Action
+    application.SendNotification();
+    application.Render();
+
+    DALI_TEST_EQUALS( actor.GetProperty( Actor::Property::POSITION ).Get< Vector3 >(), halfWayToTarget, VECTOR3_EPSILON, TEST_LOCATION );
+    DALI_TEST_EQUALS( actor.GetCurrentProperty( Actor::Property::POSITION ).Get< Vector3 >(), halfWayToTarget, VECTOR3_EPSILON, TEST_LOCATION );
+  }
+
+  END_TEST;
+}
+
+int UtcDaliAnimationPlayFromWithLoopCount(void)
+{
+  TestApplication application;
+
+  auto actor = Actor::New();
+  Stage::GetCurrent().Add( actor );
+
+  auto animation = Animation::New( 1.0f );
+  animation.AnimateTo( Property( actor, Actor::Property::POSITION_X ), 100.0f );
+  animation.SetLoopCount( 2 );
+  animation.Play();
+
+  application.SendNotification();
+  application.Render( 1001 );
+
+  // One loop completed
+
+  application.Render( 2005 );
+  application.SendNotification();
+
+  // 2 loops should have completed
+  DALI_TEST_EQUALS( animation.GetCurrentLoop(), 2u, TEST_LOCATION );
+
+  // Another render needs to occur after all the loops end
+  application.SendNotification();
+  application.Render( 1000 );
+
+  // Stop the animation and use PlayFrom, previously we got an Assert here
+  animation.Stop();
+  animation.PlayFrom( 0.5f );
+
+  application.SendNotification();
+  application.Render( 1000 );
+
+  DALI_TEST_EQUALS( animation.GetState(), Animation::PLAYING, TEST_LOCATION );
+
+  END_TEST;
+}
+
+int UtcDaliAnimationCombineToAndByWithStop(void)
+{
+  tet_infoline( "Ensure the Y Position is not modified when animating the X position using AnimateTo and AnimateBy");
+
+  TestApplication application;
+
+  auto actor = Actor::New();
+  actor.SetPosition( 100.0f, 100.0f );
+  Stage::GetCurrent().Add( actor );
+
+  auto animation = Animation::New( 1.0f );
+  const float origY = actor.GetProperty( Actor::Property::POSITION_Y ).Get< float >();
+  animation.AnimateTo( Property( actor, Actor::Property::POSITION ), Vector3( 150.0f, origY, 0.0f ), TimePeriod( 1.0f ) );
+  animation.AnimateBy( Property( actor, Actor::Property::POSITION ), Vector3( -30.0f, 0.0f, 0.0f ), TimePeriod( 1.0f, 1.0f ) );
+  animation.Play();
+
+  application.SendNotification();
+  application.Render( 500 );
+
+  application.SendNotification();
+  application.Render( 500 );
+
+  application.SendNotification();
+  application.Render( 500 );
+
+  // Stop and clear the animation using the current values
+  animation.Stop();
+  animation.Clear();
+
+  // Check the y position, it should be the same as before
+  DALI_TEST_EQUALS( actor.GetProperty( Actor::Property::POSITION_Y).Get< float >(), origY, TEST_LOCATION );
 
   END_TEST;
 }

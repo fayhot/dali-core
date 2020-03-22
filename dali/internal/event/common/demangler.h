@@ -21,9 +21,6 @@
 // EXTERNAL INCLUDES
 #include <string>
 
-// INTERNAL INCLUDES
-#include <dali/public-api/common/vector-wrapper.h>
-
 namespace Dali
 {
 
@@ -31,16 +28,7 @@ namespace Internal
 {
 
 /**
- * Demangle a nested typeid name into its component parts.
- * A nested type name is one containing namespaces and class names only.
- *   eg DemangleNestedNames(typeid(Dali::Actor).name());
- * @param[in] typeIdName The type id name string to demangle.
- * @returns the demangled list of names ie ["Dali","Actor"] or an empty list
- */
-std::vector<std::string> DemangleNestedNames(const char *typeIdName);
-
-/**
- * Demangle a nested typeid name to its class name.
+ * @brief Demangle a nested typeid name to its class name.
  * @param[in] typeIdName The type id name string to demangle.
  * @returns the class name ie "Actor" or an empty string
  */

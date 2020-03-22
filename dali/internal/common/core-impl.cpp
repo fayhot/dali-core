@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019 Samsung Electronics Co., Ltd.
+ * Copyright (c) 2020 Samsung Electronics Co., Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -86,7 +86,6 @@ Core::Core( RenderController& renderController,
             GlAbstraction& glAbstraction,
             GlSyncAbstraction& glSyncAbstraction,
             GlContextHelperAbstraction& glContextHelperAbstraction,
-            ResourcePolicy::DataRetention dataRetentionPolicy,
             Integration::RenderToFrameBuffer renderToFboEnabled,
             Integration::DepthBufferAvailable depthBufferAvailable,
             Integration::StencilBufferAvailable stencilBufferAvailable )
@@ -154,7 +153,7 @@ Core::~Core()
   if( tls )
   {
     tls->Remove();
-    delete tls;
+    tls->Unreference();
   }
 
   mObjectRegistry.Reset();
@@ -194,17 +193,6 @@ void Core::ContextDestroyed()
   mRenderManager->ContextDestroyed();
 }
 
-void Core::SurfaceResized( Integration::RenderSurface* surface )
-{
-  for( auto iter = mScenes.begin(); iter != mScenes.end(); ++iter )
-  {
-    if( (*iter)->GetSurface() == surface )
-    {
-      (*iter)->SurfaceResized();
-    }
-  }
-}
-
 void Core::SurfaceDeleted( Integration::RenderSurface* surface )
 {
   for( auto scene : mScenes )
@@ -241,9 +229,9 @@ void Core::Update( float elapsedSeconds, uint32_t lastVSyncTimeMilliseconds, uin
   // Any message to update will wake it up anyways
 }
 
-void Core::Render( RenderStatus& status, bool forceClear )
+void Core::Render( RenderStatus& status, bool forceClear, bool uploadOnly )
 {
-  mRenderManager->Render( status, forceClear );
+  mRenderManager->Render( status, forceClear, uploadOnly );
 }
 
 void Core::SceneCreated()
@@ -444,7 +432,8 @@ void Core::CreateThreadLocalStorage()
 {
   // a pointer to the ThreadLocalStorage object will be stored in TLS
   // The ThreadLocalStorage object should be deleted by the Core destructor
-  new ThreadLocalStorage(this);
+  ThreadLocalStorage* tls = new ThreadLocalStorage(this);
+  tls->Reference();
 }
 
 void Core::RegisterObject( Dali::BaseObject* object )

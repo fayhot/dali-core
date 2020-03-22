@@ -2,7 +2,7 @@
 #define DALI_ACTOR_DEVEL_H
 
 /*
- * Copyright (c) 2018 Samsung Electronics Co., Ltd.
+ * Copyright (c) 2019 Samsung Electronics Co., Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@
 
 // INTERNAL INCLUDES
 #include <dali/public-api/actors/actor.h>
+#include <dali/public-api/math/rect.h>
 
 namespace Dali
 {
@@ -108,6 +109,7 @@ enum Type
    * @brief Returns the screen position of the Actor
    * @details Name "screenPosition", type Property::VECTOR2. Read-only
    * @note This assumes default camera and default render-task and the Z position is ZERO.
+   * @note The last known frame is used for the calculation. May not match a position value just set.
    */
   SCREEN_POSITION = INHERIT_LAYOUT_DIRECTION + 3,
 
@@ -158,6 +160,14 @@ typedef Signal< void ( Actor, bool, VisibilityChange::Type ) > VisibilityChanged
  * @note This signal is NOT emitted if the actor becomes transparent (or the reverse), it's only linked with Actor::Property::VISIBLE.
  */
 DALI_CORE_API VisibilityChangedSignalType& VisibilityChangedSignal( Actor actor );
+
+/**
+ * Calculates screen position and size.
+ *
+ * @return pair of two values, position of top-left corner on screen and size respectively.
+ */
+DALI_CORE_API Rect<> CalculateScreenExtents( Actor actor );
+
 
 
 typedef Signal< void (Actor) > ChildChangedSignalType; ///< Called when the actor has a child added or removed

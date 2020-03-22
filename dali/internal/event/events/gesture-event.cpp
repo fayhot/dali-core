@@ -28,13 +28,17 @@ GestureEvent::~GestureEvent()
 {
 }
 
-GestureEvent::GestureEvent(Gesture::Type gesture, Gesture::State gestureState)
-: gestureType(gesture),
-  state(gestureState),
-  time(0)
+GestureEvent::GestureEvent( DevelGesture::Type gesture, Gesture::State gestureState )
+: gestureType( gesture ),
+  state( gestureState ),
+  time( 0 )
 {
 }
 
+GestureEvent::GestureEvent(Gesture::Type gesture, Gesture::State gestureState)
+: GestureEvent( static_cast< DevelGesture::Type >( gesture ), gestureState )
+{
+}
 } // namespace Internal
 
 } // namespace Dali

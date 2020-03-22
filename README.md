@@ -13,6 +13,7 @@
          * [NON-SMACK Targets](#non-smack-targets)
          * [SMACK enabled Targets](#smack-enabled-targets)
          * [DEBUG Builds](#debug-builds)
+      * [3. Building for MS Windows](#3-building-for-ms-windows)
 
 # Build Instructions
 
@@ -63,10 +64,14 @@ To build the repository enter the 'build/tizen' folder:
 
          $ cd dali-core/build/tizen
 
-Then run the following commands:
+Then run the following command to set up the build:
 
-         $ autoreconf --install
-         $ ./configure --prefix=$DESKTOP_PREFIX
+         $ cmake -DCMAKE_INSTALL_PREFIX=$DESKTOP_PREFIX .
+
+If a Debug build is required, then add -DCMAKE_BUILD_TYPE=Debug
+
+To build run:
+
          $ make install -j8
 
 ### Building and executing test cases
@@ -87,3 +92,13 @@ See the README.md in dali-core/automated-tests.
 
          $ gbs build -A [TARGET_ARCH] --define "%enable_debug 1"
 
+## 3. Building for MS Windows
+
+Third party dependencies are built using vcpkg. Instructions on how to install vcpkg can be found in the
+vcpkg-script folder in the windows-dependencies repository.
+
+- Download the windows-dependencies repository from DaliHub
+
+         $ git clone https://github.com/dalihub/windows-dependencies.git
+
+- Read the README.md and vcpkg-script/Readme.md files for more instructions on how to install and build the third-party dependencies.

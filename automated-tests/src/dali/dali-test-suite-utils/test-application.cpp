@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019 Samsung Electronics Co., Ltd.
+ * Copyright (c) 2020 Samsung Electronics Co., Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,15 +26,14 @@ TestApplication::TestApplication( uint32_t surfaceWidth,
                                   uint32_t surfaceHeight,
                                   uint32_t  horizontalDpi,
                                   uint32_t  verticalDpi,
-                                  ResourcePolicy::DataRetention policy,
                                   bool initialize )
-: mCore( NULL ),
+: mRenderSurface( NULL ),
+  mCore( NULL ),
   mSurfaceWidth( surfaceWidth ),
   mSurfaceHeight( surfaceHeight ),
   mFrame( 0u ),
   mDpi{ horizontalDpi, verticalDpi },
-  mLastVSyncTime(0u),
-  mDataRetentionPolicy( policy )
+  mLastVSyncTime(0u)
 {
   if( initialize )
   {
@@ -59,7 +58,6 @@ void TestApplication::CreateCore()
                                         mGlAbstraction,
                                         mGlSyncAbstraction,
                                         mGlContextHelperAbstraction,
-                                        mDataRetentionPolicy,
                                         Integration::RenderToFrameBuffer::FALSE,
                                         Integration::DepthBufferAvailable::TRUE,
                                         Integration::StencilBufferAvailable::TRUE );
@@ -78,11 +76,8 @@ void TestApplication::CreateCore()
 void TestApplication::CreateScene()
 {
   mRenderSurface = new TestRenderSurface( Dali::PositionSize( 0, 0, mSurfaceWidth, mSurfaceHeight ) );
-  mScene = Dali::Integration::Scene::New( Vector2( static_cast<float>( mSurfaceWidth ), static_cast<float>( mSurfaceHeight ) ) );
-  mScene.SetSurface( *mRenderSurface );
+  mScene = Dali::Integration::Scene::New( *mRenderSurface );
   mScene.SetDpi( Vector2( static_cast<float>( mDpi.x ), static_cast<float>( mDpi.y ) ) );
-
-  mCore->SurfaceResized( mRenderSurface );
 }
 
 void TestApplication::InitializeCore()
@@ -195,7 +190,7 @@ void TestApplication::DoUpdate( uint32_t intervalMilliseconds, const char* locat
 bool TestApplication::Render( uint32_t intervalMilliseconds, const char* location )
 {
   DoUpdate( intervalMilliseconds, location );
-  mCore->Render( mRenderStatus, false );
+  mCore->Render( mRenderStatus, false /*do not force clear*/, false /*do not skip rendering*/ );
 
   mFrame++;
 
@@ -221,7 +216,7 @@ bool TestApplication::GetRenderNeedsUpdate()
 bool TestApplication::RenderOnly( )
 {
   // Update Time values
-  mCore->Render( mRenderStatus, false );
+  mCore->Render( mRenderStatus, false /*do not force clear*/, false /*do not skip rendering*/ );
 
   mFrame++;
 

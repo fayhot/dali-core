@@ -25,6 +25,7 @@
 #include <dali/integration-api/events/wheel-event-integ.h>
 
 #include <dali-test-suite-utils.h>
+#include <mesh-builder.h>
 
 // Internal headers are allowed here
 
@@ -141,7 +142,8 @@ struct TouchFunctor
 
     if ( signalData.createNewScene )
     {
-      Dali::Integration::Scene scene = Dali::Integration::Scene::New( Vector2( 480.0f, 800.0f ) );
+      TestRenderSurface* surface = new TestRenderSurface( PositionSize( 0.0f, 0.0f, 480.0f, 800.0f ) ); // This is a leak, but we need to keep the surface alive till the end
+      Dali::Integration::Scene scene = Dali::Integration::Scene::New( *surface );
       DALI_TEST_CHECK( scene );
 
       signalData.newSceneCreated = true;
@@ -186,6 +188,50 @@ struct WheelEventReceivedFunctor
   }
 
   WheelEventSignalData& signalData;
+};
+
+// Stores data that is populated in the KeyEventGeneratedSignal callback and will be read by the TET cases
+struct KeyEventGeneratedSignalData
+{
+  KeyEventGeneratedSignalData()
+  : functorCalled(false)
+  {}
+
+  void Reset()
+  {
+    functorCalled = false;
+
+    receivedKeyEvent.keyModifier = 0;
+    receivedKeyEvent.keyPressedName.clear();
+    receivedKeyEvent.keyPressed.clear();
+  }
+
+  bool functorCalled;
+  KeyEvent receivedKeyEvent;
+};
+
+// Functor that sets the data when called
+struct KeyEventGeneratedReceivedFunctor
+{
+  KeyEventGeneratedReceivedFunctor( KeyEventGeneratedSignalData& data )
+  : signalData( data )
+  {}
+
+  bool operator()( const KeyEvent& keyEvent )
+  {
+    signalData.functorCalled = true;
+    signalData.receivedKeyEvent = keyEvent;
+
+    return true;
+  }
+
+  bool operator()()
+  {
+    signalData.functorCalled = true;
+    return true;
+  }
+
+  KeyEventGeneratedSignalData& signalData;
 };
 
 void GenerateTouch( TestApplication& application, PointState::Type state, const Vector2& screenPosition )
@@ -361,7 +407,8 @@ int UtcDaliSceneDiscard(void)
   tet_infoline("Testing Dali::Scene::Discard");
 
   // Create a new Scene
-  Dali::Integration::Scene scene = Dali::Integration::Scene::New( Vector2( 480.0f, 800.0f ) );
+  TestRenderSurface surface( PositionSize( 0.0f, 0.0f, 480.0f, 800.0f ) );
+  Dali::Integration::Scene scene = Dali::Integration::Scene::New( surface );
   DALI_TEST_CHECK( scene );
 
   // One reference of scene kept here and the other one kept in the Core
@@ -431,11 +478,16 @@ int UtcDaliSceneRootLayerAndSceneAlignment(void)
   TestApplication application;
 
   // Create a Scene
-  Dali::Integration::Scene scene = Dali::Integration::Scene::New( Vector2( 480.0f, 800.0f ) );
+  TestRenderSurface surface( PositionSize( 0.0f, 0.0f, 480.0f, 800.0f ) );
+  Dali::Integration::Scene scene = Dali::Integration::Scene::New( surface );
   DALI_TEST_CHECK( scene );
 
   // One reference of scene kept here and the other one kept in the Core
   DALI_TEST_CHECK( scene.GetBaseObject().ReferenceCount() == 2 );
+
+  // Add a renderable actor to the scene
+  auto actor = CreateRenderableActor();
+  scene.Add( actor );
 
   // Render and notify.
   application.SendNotification();
@@ -462,7 +514,8 @@ int UtcDaliSceneRootLayerAndSceneAlignment(void)
   DALI_TEST_CHECK( rootLayer.GetBaseObject().ReferenceCount() == 1 );
 
   // Create a new Scene while the root layer of the deleted scene is still alive
-  Dali::Integration::Scene newScene = Dali::Integration::Scene::New( Vector2( 480.0f, 800.0f ) );
+  TestRenderSurface surface2( PositionSize( 0.0f, 0.0f, 480.0f, 800.0f ) );
+  Dali::Integration::Scene newScene = Dali::Integration::Scene::New( surface2 );
   DALI_TEST_CHECK( newScene );
 
   // Render and notify.
@@ -487,13 +540,12 @@ int UtcDaliSceneDeleteSurface(void)
 {
   TestApplication application;
 
-  // Create a Scene
-  Dali::Integration::Scene scene = Dali::Integration::Scene::New( Vector2( 480.0f, 800.0f ) );
-  DALI_TEST_CHECK( scene );
-
   // Create the render surface for the scene
   TestRenderSurface* renderSurface = new TestRenderSurface( Dali::PositionSize( 0, 0, 480.0f, 800.0f ) );
-  scene.SetSurface( *renderSurface );
+
+  // Create a Scene
+  Dali::Integration::Scene scene = Dali::Integration::Scene::New( *renderSurface );
+  DALI_TEST_CHECK( scene );
 
   // Render and notify.
   application.SendNotification();
@@ -870,12 +922,350 @@ int UtcDaliSceneEnsureEmptySceneCleared(void)
 
   TestApplication application;
 
+  auto& glAbstraction = application.GetGlAbstraction();
+  auto clearCountBefore = glAbstraction.GetClearCountCalled();
+
+  application.SendNotification();
+  application.Render();
+
+  // No actor, no rendering at all
+  DALI_TEST_EQUALS( glAbstraction.GetClearCountCalled(), clearCountBefore, TEST_LOCATION );
+  DALI_TEST_EQUALS( glAbstraction.GetLastClearColor(), Color::TRANSPARENT, TEST_LOCATION );
+
+  // Need to create a renderable as we don't start rendering until we have at least one
+  // We don't need to add this to any scene
+  auto actor = CreateRenderableActor();
+
+  application.SendNotification();
+  application.Render();
+
+  // Default background color
+  DALI_TEST_EQUALS( glAbstraction.GetClearCountCalled(), clearCountBefore + 1, TEST_LOCATION );
+  DALI_TEST_EQUALS( glAbstraction.GetLastClearColor(), Color::BLACK, TEST_LOCATION );
+
   // Create a new scene and set the background colors of both the new and the main scenes
   auto defaultScene = application.GetScene();
   defaultScene.SetBackgroundColor( Color::WHITE );
 
-  auto newScene = Integration::Scene::New( Vector2( 480.0f, 800.0f ) );
+  application.SendNotification();
+  application.Render();
+
+  DALI_TEST_EQUALS( glAbstraction.GetClearCountCalled(), clearCountBefore + 2, TEST_LOCATION );
+  DALI_TEST_EQUALS( glAbstraction.GetLastClearColor(), Color::WHITE, TEST_LOCATION );
+
+  TestRenderSurface surface( PositionSize( 0.0f, 0.0f, 480.0f, 800.0f ) );
+  auto newScene = Integration::Scene::New( surface );
   newScene.SetBackgroundColor( Color::RED );
+
+  application.SendNotification();
+  application.Render();
+
+  // + 2 clear for 2 scenes
+  DALI_TEST_EQUALS( glAbstraction.GetClearCountCalled(), clearCountBefore + 4, TEST_LOCATION );
+  DALI_TEST_EQUALS( glAbstraction.GetLastClearColor(), Color::RED, TEST_LOCATION );
+
+  // Add the actor to the main scene
+  defaultScene.Add( actor );
+
+  application.SendNotification();
+  application.Render();
+
+  // + 2 clear for 2 scenes
+  DALI_TEST_EQUALS( glAbstraction.GetClearCountCalled(), clearCountBefore + 6, TEST_LOCATION );
+  DALI_TEST_EQUALS( glAbstraction.GetLastClearColor(), Color::RED, TEST_LOCATION );
+
+  // Add another scene and set its background color, ensure we clear it to the appropriate color
+  // + 3 clear for 3 scenes
+  TestRenderSurface surface2( PositionSize( 0.0f, 0.0f, 480.0f, 800.0f ) );
+  auto thirdScene = Integration::Scene::New( surface2 );
+  thirdScene.SetBackgroundColor( Color::BLUE );
+
+  application.SendNotification();
+  application.Render();
+
+  DALI_TEST_EQUALS( glAbstraction.GetClearCountCalled(), clearCountBefore + 9, TEST_LOCATION );
+  DALI_TEST_EQUALS( glAbstraction.GetLastClearColor(), Color::BLUE, TEST_LOCATION );
+
+  END_TEST;
+}
+
+int UtcDaliSceneSurfaceResizedDefaultScene(void)
+{
+  tet_infoline( "Ensure resizing of the surface is handled properly" );
+
+  TestApplication application;
+
+  auto defaultScene = application.GetScene();
+  Integration::RenderSurface* defaultSurface = defaultScene.GetSurface();
+  DALI_TEST_CHECK( defaultSurface );
+
+  // Ensure stage size matches the surface size
+  auto stage = Stage::GetCurrent();
+  DALI_TEST_EQUALS( stage.GetSize(), Vector2( defaultSurface->GetPositionSize().width, defaultSurface->GetPositionSize().height ), TEST_LOCATION );
+
+  // Resize the surface and inform the scene accordingly
+  Vector2 newSize( 1000.0f, 2000.0f );
+  DALI_TEST_CHECK( stage.GetSize() != newSize );
+  defaultSurface->MoveResize( PositionSize( 0, 0, newSize.width, newSize.height ) );
+  defaultScene.SurfaceResized();
+
+  DALI_TEST_EQUALS( stage.GetSize(), newSize, TEST_LOCATION );
+  DALI_TEST_EQUALS( defaultScene.GetSize(), newSize, TEST_LOCATION );
+
+  END_TEST;
+}
+
+int UtcDaliSceneSurfaceResizedDefaultSceneViewport(void)
+{
+  tet_infoline( "Ensure resizing of the surface & viewport is handled properly" );
+
+  TestApplication application;
+  TestGlAbstraction& glAbstraction = application.GetGlAbstraction();
+  TraceCallStack& callStack = glAbstraction.GetViewportTrace();
+  glAbstraction.EnableViewportCallTrace( true );
+
+  // Initial scene setup
+  Geometry geometry = CreateQuadGeometry();
+  Shader shader = CreateShader();
+  Renderer renderer = Renderer::New( geometry, shader );
+
+  Actor actor = Actor::New();
+  actor.AddRenderer(renderer);
+  actor.SetSize(400, 400);
+  Stage::GetCurrent().Add(actor);
+
+  // Render before resizing surface
+  application.SendNotification();
+  application.Render(0);
+  glAbstraction.ResetViewportCallStack();
+
+  auto defaultScene = application.GetScene();
+  Integration::RenderSurface* defaultSurface = defaultScene.GetSurface();
+  DALI_TEST_CHECK( defaultSurface );
+
+  // Ensure stage size matches the surface size
+  auto stage = Stage::GetCurrent();
+  DALI_TEST_EQUALS( stage.GetSize(), Vector2( defaultSurface->GetPositionSize().width, defaultSurface->GetPositionSize().height ), TEST_LOCATION );
+
+  // Resize the surface and inform the scene accordingly
+  Vector2 newSize( 1000.0f, 2000.0f );
+  std::string viewportParams( "0, 0, 1000, 2000" ); // to match newSize
+  DALI_TEST_CHECK( stage.GetSize() != newSize );
+  defaultSurface->MoveResize( PositionSize( 0, 0, newSize.width, newSize.height ) );
+  defaultScene.SurfaceResized();
+
+  DALI_TEST_EQUALS( stage.GetSize(), newSize, TEST_LOCATION );
+  DALI_TEST_EQUALS( defaultScene.GetSize(), newSize, TEST_LOCATION );
+
+  // Render after resizing surface
+  application.SendNotification();
+  application.Render(0);
+
+  // Check that the viewport is handled properly
+  DALI_TEST_CHECK( callStack.FindMethodAndGetParameters("Viewport", viewportParams ) );
+
+  END_TEST;
+}
+
+int UtcDaliSceneSurfaceResizedMultipleRenderTasks(void)
+{
+  tet_infoline( "Ensure resizing of the surface & viewport is handled properly" );
+
+  TestApplication application;
+  TestGlAbstraction& glAbstraction = application.GetGlAbstraction();
+  TraceCallStack& callStack = glAbstraction.GetViewportTrace();
+  glAbstraction.EnableViewportCallTrace( true );
+
+  // Initial scene setup
+  auto stage = Stage::GetCurrent();
+
+  Geometry geometry = CreateQuadGeometry();
+  Shader shader = CreateShader();
+  Renderer renderer = Renderer::New( geometry, shader );
+
+  Actor actor = Actor::New();
+  actor.AddRenderer(renderer);
+  int testWidth = 400;
+  int testHeight = 400;
+  actor.SetSize(testWidth, testHeight);
+  stage.Add(actor);
+
+  CameraActor offscreenCameraActor = CameraActor::New( Size( testWidth, testHeight ) );
+  Stage::GetCurrent().Add( offscreenCameraActor );
+
+  FrameBuffer newFrameBuffer = FrameBuffer::New( testWidth, testHeight, FrameBuffer::Attachment::NONE );
+
+  RenderTask newTask = stage.GetRenderTaskList().CreateTask();
+  newTask.SetCameraActor( offscreenCameraActor );
+  newTask.SetSourceActor( actor );
+  newTask.SetFrameBuffer( newFrameBuffer );
+  newTask.SetViewportPosition( Vector2(0, 0) );
+  newTask.SetViewportSize( Vector2(testWidth, testHeight) );
+
+  // Render before resizing surface
+  application.SendNotification();
+  application.Render(0);
+  glAbstraction.ResetViewportCallStack();
+
+  Rect<int32_t> initialViewport = newTask.GetViewport();
+  int initialWidth = initialViewport.width;
+  int initialHeight = initialViewport.height;
+  DALI_TEST_EQUALS( initialWidth, testWidth, TEST_LOCATION );
+  DALI_TEST_EQUALS( initialHeight, testHeight, TEST_LOCATION );
+
+  auto defaultScene = application.GetScene();
+  Integration::RenderSurface* defaultSurface = defaultScene.GetSurface();
+  DALI_TEST_CHECK( defaultSurface );
+
+  // Ensure stage size matches the surface size
+  DALI_TEST_EQUALS( stage.GetSize(), Vector2( defaultSurface->GetPositionSize().width, defaultSurface->GetPositionSize().height ), TEST_LOCATION );
+
+  // Resize the surface and inform the scene accordingly
+  Vector2 newSize( 800.0f, 480.0f );
+  std::string viewportParams( "0, 0, 800, 480" ); // to match newSize
+  DALI_TEST_CHECK( stage.GetSize() != newSize );
+  defaultSurface->MoveResize( PositionSize( 0, 0, newSize.width, newSize.height ) );
+  defaultScene.SurfaceResized();
+
+  DALI_TEST_EQUALS( stage.GetSize(), newSize, TEST_LOCATION );
+  DALI_TEST_EQUALS( defaultScene.GetSize(), newSize, TEST_LOCATION );
+
+  // Render after resizing surface
+  application.SendNotification();
+  application.Render(0);
+
+  // Check that the viewport is handled properly
+  DALI_TEST_CHECK( callStack.FindMethodAndGetParameters("Viewport", viewportParams ) );
+
+  // Second render-task should not be affected
+  Rect<int32_t> viewport = newTask.GetViewport();
+  int width = viewport.width;
+  int height = viewport.height;
+  DALI_TEST_EQUALS( width, testWidth, TEST_LOCATION );
+  DALI_TEST_EQUALS( height, testHeight, TEST_LOCATION );
+
+  END_TEST;
+}
+
+int UtcDaliSceneSurfaceResizedAdditionalScene(void)
+{
+  tet_infoline( "Ensure resizing of the surface is handled properly on additional scenes" );
+
+  TestApplication application;
+  Vector2 originalSurfaceSize( 500.0f, 1000.0f );
+
+  TestRenderSurface surface( PositionSize( 0.0f, 0.0f, originalSurfaceSize.width, originalSurfaceSize.height ) );
+  auto scene = Integration::Scene::New( surface );
+
+  // Ensure stage size does NOT match the surface size
+  auto stage = Stage::GetCurrent();
+  const auto stageSize = stage.GetSize();
+  DALI_TEST_CHECK( stageSize != originalSurfaceSize );
+  DALI_TEST_EQUALS( originalSurfaceSize, scene.GetSize(), TEST_LOCATION );
+
+  // Resize the surface and inform the scene accordingly
+  Vector2 newSize( 1000.0f, 2000.0f );
+  DALI_TEST_CHECK( stage.GetSize() != newSize );
+  surface.MoveResize( PositionSize( 0, 0, newSize.width, newSize.height ) );
+  scene.SurfaceResized();
+
+  // Ensure the stage hasn't been resized
+  DALI_TEST_EQUALS( stage.GetSize(), stageSize, TEST_LOCATION );
+  DALI_TEST_EQUALS( scene.GetSize(), newSize, TEST_LOCATION );
+
+  END_TEST;
+}
+
+int UtcDaliSceneSetSurface(void)
+{
+  tet_infoline( "Scene::SetSurface test" );
+
+  TestApplication application;
+
+  // Create a scene with a surface and ensure the size and surface is set correctly on the scene
+  Vector2 surfaceSize( 480.0f, 800.0f );
+  TestRenderSurface surface( PositionSize( 0.0f, 0.0f, surfaceSize.width, surfaceSize.height ) );
+  auto scene = Integration::Scene::New( surface );
+  DALI_TEST_EQUALS( scene.GetSize(), surfaceSize, TEST_LOCATION );
+  DALI_TEST_CHECK( scene.GetSurface() == &surface );
+
+  // Create a new surface and set that on the scene
+  Vector2 newSurfaceSize( 1000.0f, 1000.0f );
+  TestRenderSurface newSurface( PositionSize( 0.0f, 0.0f, newSurfaceSize.width, newSurfaceSize.height ) );
+  scene.SetSurface( newSurface );
+  DALI_TEST_EQUALS( scene.GetSize(), newSurfaceSize, TEST_LOCATION );
+  DALI_TEST_CHECK( scene.GetSurface() == &newSurface );
+
+  // Ensure setting the same surface again doesn't have any side effects
+  scene.SetSurface( newSurface );
+  DALI_TEST_EQUALS( scene.GetSize(), newSurfaceSize, TEST_LOCATION );
+  DALI_TEST_CHECK( scene.GetSurface() == &newSurface );
+
+  END_TEST;
+}
+
+int UtcDaliSceneKeyEventGeneratedSignalP(void)
+{
+  TestApplication application;
+  Dali::Integration::Scene scene = application.GetScene();
+
+  KeyEventGeneratedSignalData data;
+  KeyEventGeneratedReceivedFunctor functor( data );
+  scene.KeyEventGeneratedSignal().Connect( &application, functor );
+
+  Integration::KeyEvent event( "a", "", "a", 0, 0, 0, Integration::KeyEvent::Up, "a", DEFAULT_DEVICE_NAME, Device::Class::NONE, Device::Subclass::NONE );
+  application.ProcessEvent( event );
+
+  DALI_TEST_EQUALS( true, data.functorCalled, TEST_LOCATION );
+  DALI_TEST_CHECK( event.keyModifier == data.receivedKeyEvent.keyModifier );
+  DALI_TEST_CHECK( event.keyName == data.receivedKeyEvent.keyPressedName );
+  DALI_TEST_CHECK( event.keyString == data.receivedKeyEvent.keyPressed );
+  DALI_TEST_CHECK( event.state == static_cast<Integration::KeyEvent::State>( data.receivedKeyEvent.state ) );
+
+  data.Reset();
+
+  Integration::KeyEvent event2( "i", "", "i", 0, 0, 0, Integration::KeyEvent::Up, "i", DEFAULT_DEVICE_NAME, Device::Class::NONE, Device::Subclass::NONE );
+  application.ProcessEvent( event2 );
+
+  DALI_TEST_EQUALS( true, data.functorCalled, TEST_LOCATION );
+  DALI_TEST_CHECK( event2.keyModifier == data.receivedKeyEvent.keyModifier );
+  DALI_TEST_CHECK( event2.keyName == data.receivedKeyEvent.keyPressedName );
+  DALI_TEST_CHECK( event2.keyString == data.receivedKeyEvent.keyPressed );
+  DALI_TEST_CHECK( event2.state == static_cast<Integration::KeyEvent::State>( data.receivedKeyEvent.state ) );
+
+  data.Reset();
+
+  Integration::KeyEvent event3( "a", "", "a", 0, 0, 0, Integration::KeyEvent::Down, "a", DEFAULT_DEVICE_NAME, Device::Class::NONE, Device::Subclass::NONE );
+  application.ProcessEvent( event3 );
+
+  DALI_TEST_EQUALS( true, data.functorCalled, TEST_LOCATION );
+  DALI_TEST_CHECK( event3.keyModifier == data.receivedKeyEvent.keyModifier );
+  DALI_TEST_CHECK( event3.keyName == data.receivedKeyEvent.keyPressedName );
+  DALI_TEST_CHECK( event3.keyString == data.receivedKeyEvent.keyPressed );
+  DALI_TEST_CHECK( event3.state == static_cast<Integration::KeyEvent::State>( data.receivedKeyEvent.state ) );
+
+  data.Reset();
+
+  Integration::KeyEvent event4( "a", "", "a", 0, 0, 0, Integration::KeyEvent::Up, "a", DEFAULT_DEVICE_NAME, Device::Class::NONE, Device::Subclass::NONE );
+  application.ProcessEvent( event4 );
+
+  DALI_TEST_EQUALS( true, data.functorCalled, TEST_LOCATION );
+  DALI_TEST_CHECK( event4.keyModifier == data.receivedKeyEvent.keyModifier );
+  DALI_TEST_CHECK( event4.keyName == data.receivedKeyEvent.keyPressedName );
+  DALI_TEST_CHECK( event4.keyString == data.receivedKeyEvent.keyPressed );
+  DALI_TEST_CHECK( event4.state == static_cast<Integration::KeyEvent::State>( data.receivedKeyEvent.state ) );
+  END_TEST;
+}
+
+int UtcDaliSceneEnsureReplacedSurfaceKeepsClearColor(void)
+{
+  tet_infoline( "Ensure we keep background color when the scene surface is replaced " );
+
+  TestApplication application;
+
+  // Create a new scene and set the background color of the main scene
+  auto defaultScene = application.GetScene();
+  defaultScene.SetBackgroundColor( Color::BLUE );
 
   // Need to create a renderable as we don't start rendering until we have at least one
   // We don't need to add this to any scene
@@ -887,25 +1277,43 @@ int UtcDaliSceneEnsureEmptySceneCleared(void)
   application.SendNotification();
   application.Render();
 
+  DALI_TEST_EQUALS( glAbstraction.GetClearCountCalled(), clearCountBefore + 1, TEST_LOCATION );
+  DALI_TEST_EQUALS( glAbstraction.GetLastClearColor(), Color::BLUE, TEST_LOCATION );
+
+  TestRenderSurface surface( PositionSize( 0.0f, 0.0f, 480.0f, 800.0f ) );
+  defaultScene.SetSurface( surface );
+
+  application.SendNotification();
+  application.Render();
+
   DALI_TEST_EQUALS( glAbstraction.GetClearCountCalled(), clearCountBefore + 2, TEST_LOCATION );
+  DALI_TEST_EQUALS( glAbstraction.GetLastClearColor(), Color::BLUE, TEST_LOCATION );
 
-  // Add the actor to the main scene
-  defaultScene.Add( actor );
+  // Check when the main render task viewport is set the clear color is clipped using scissors
+  TraceCallStack& scissorTrace = glAbstraction.GetScissorTrace();
+  TraceCallStack& enabledDisableTrace = glAbstraction.GetEnableDisableTrace();
+  scissorTrace.Enable( true );
+  enabledDisableTrace.Enable( true );
 
-  application.SendNotification();
-  application.Render();
-
-  // Add another scene and set its background color, ensure we clear it to the appropriate color
-
-  auto thirdScene = Integration::Scene::New( Vector2( 200.0f, 200.0f ) );
-  thirdScene.SetBackgroundColor( Color::BLUE );
-
-  clearCountBefore = glAbstraction.GetClearCountCalled();
+  defaultScene.GetRenderTaskList().GetTask( 0 ).SetViewport( Viewport( 0.0f, 0.0f, 100.0f, 100.0f ) );
 
   application.SendNotification();
   application.Render();
+
+  // Check scissor test was enabled.
+  DALI_TEST_CHECK( enabledDisableTrace.FindMethodAndParams( "Enable", "3089" ) ); // 3089 = 0xC11 (GL_SCISSOR_TEST)
+
+  // Check the scissor was set, and the coordinates are correct.
+  DALI_TEST_CHECK( scissorTrace.FindMethodAndParams( "Scissor", "0, 700, 100, 100" ) );
 
   DALI_TEST_EQUALS( glAbstraction.GetClearCountCalled(), clearCountBefore + 3, TEST_LOCATION );
+  DALI_TEST_EQUALS( glAbstraction.GetLastClearColor(), Color::BLUE, TEST_LOCATION );
+
+  scissorTrace.Enable( false );
+  scissorTrace.Reset();
+
+  enabledDisableTrace.Enable( false );
+  enabledDisableTrace.Reset();
 
   END_TEST;
 }

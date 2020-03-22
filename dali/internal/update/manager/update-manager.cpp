@@ -693,6 +693,13 @@ void UpdateManager::ResetProperties( BufferIndex bufferIndex )
     mImpl->propertyResetters.EraseObject( elementPtr );
   }
 
+  // Clear all root nodes dirty flags
+  for( auto& scene : mImpl->scenes )
+  {
+    auto root = scene->root;
+    root->ResetDirtyFlags( bufferIndex );
+  }
+
   // Clear node dirty flags
   Vector<Node*>::Iterator iter = mImpl->nodes.Begin()+1;
   Vector<Node*>::Iterator endIter = mImpl->nodes.End();
@@ -1031,6 +1038,9 @@ uint32_t UpdateManager::Update( float elapsedSeconds,
   if( keepRendererRendering )
   {
     keepUpdating |= KeepUpdating::STAGE_KEEP_RENDERING;
+
+    // Set dirty flags for next frame to continue rendering
+    mImpl->nodeDirtyFlags |= RenderableUpdateFlags;
   }
 
   // tell the update manager that we're done so the queue can be given to event thread
@@ -1077,17 +1087,6 @@ uint32_t UpdateManager::KeepUpdatingCheck( float elapsedSeconds ) const
   }
 
   return keepUpdatingRequest;
-}
-
-void UpdateManager::SetBackgroundColor( const Vector4& color )
-{
-  typedef MessageValue1< RenderManager, Vector4 > DerivedType;
-
-  // Reserve some memory inside the render queue
-  uint32_t* slot = mImpl->renderQueue.ReserveMessageSlot( mSceneGraphBuffers.GetUpdateBufferIndex(), sizeof( DerivedType ) );
-
-  // Construct message in the render queue memory; note that delete should not be called on the return value
-  new (slot) DerivedType( &mImpl->renderManager, &RenderManager::SetBackgroundColor, color );
 }
 
 void UpdateManager::SetDefaultSurfaceRect( const Rect<int32_t>& rect )

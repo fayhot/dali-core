@@ -122,12 +122,6 @@ public:
 
   // The following methods should be called via RenderQueue messages
 
-  /**
-   * Set the background color i.e. the glClear color used at the beginning of each frame.
-   * @param[in] color The new background color.
-   */
-  void SetBackgroundColor( const Vector4& color );
-
   /*
    * Set the frame time delta (time elapsed since the last frame.
    * @param[in] deltaTime the delta time
@@ -327,9 +321,10 @@ public:
   /**
    * Renders the results of the previous "update" traversal.
    * @param[out] status contains the rendering flags.
-   * @param[in] forceClear force the Clear on the framebuffer even if nothing is rendered.
+   * @param[in] forceClear Force the Clear on the framebuffer even if nothing is rendered.
+   * @param[in] uploadOnly Upload the resource only without rendering.
    */
-  void Render( Integration::RenderStatus& status, bool forceClear );
+  void Render( Integration::RenderStatus& status, bool forceClear, bool uploadOnly );
 
 private:
 

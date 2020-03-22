@@ -21,10 +21,11 @@
 // INTERNAL INCLUDES
 #include <dali/public-api/actors/actor.h>
 #include <dali/internal/event/events/gesture-detector-impl.h>
-#include <dali/internal/event/events/long-press-gesture-processor.h>
-#include <dali/internal/event/events/pan-gesture-processor.h>
-#include <dali/internal/event/events/pinch-gesture-processor.h>
-#include <dali/internal/event/events/tap-gesture-processor.h>
+#include <dali/internal/event/events/long-press-gesture/long-press-gesture-processor.h>
+#include <dali/internal/event/events/pan-gesture/pan-gesture-processor.h>
+#include <dali/internal/event/events/pinch-gesture/pinch-gesture-processor.h>
+#include <dali/internal/event/events/rotation-gesture/rotation-gesture-processor.h>
+#include <dali/internal/event/events/tap-gesture/tap-gesture-processor.h>
 
 namespace Dali
 {
@@ -251,6 +252,46 @@ public: // Called by Core
    */
   void SetPinchGestureMinimumDistance( float value);
 
+  /**
+   * @brief Sets the minimum touch events required before a pinch can be started
+   *
+   * @param[in] value The number of touch events
+   */
+  void SetPinchGestureMinimumTouchEvents( uint32_t value );
+
+  /**
+   * @brief Sets the minimum touch events required after a pinch started
+   *
+   * @param[in] value The number of touch events
+   */
+  void SetPinchGestureMinimumTouchEventsAfterStart( uint32_t value );
+
+  /**
+   * @brief Sets the minimum touch events required before a rotation can be started
+   *
+   * @param[in] value The number of touch events
+   */
+  void SetRotationGestureMinimumTouchEvents( uint32_t value );
+
+  /**
+   * @brief Sets the minimum touch events required after a rotation started
+   *
+   * @param[in] value The number of touch events
+   */
+  void SetRotationGestureMinimumTouchEventsAfterStart( uint32_t value );
+
+  /**
+   * @brief Sets the minimum holding time required to be recognized as a long press gesture
+   *
+   * @param[in] value The time value in milliseconds
+   */
+  void SetLongPressMinimumHoldingTime( uint32_t value );
+
+  /**
+   * @return The minimum holding time required to be recognized as a long press gesture in milliseconds
+   */
+  uint32_t GetLongPressMinimumHoldingTime() const;
+
 public: // needed for PanGesture
 
   /**
@@ -270,6 +311,7 @@ private:
   PanGestureProcessor mPanGestureProcessor;
   PinchGestureProcessor mPinchGestureProcessor;
   TapGestureProcessor mTapGestureProcessor;
+  RotationGestureProcessor mRotationGestureProcessor;
   Integration::RenderController& mRenderController;
 
   int32_t envOptionMinimumPanDistance;

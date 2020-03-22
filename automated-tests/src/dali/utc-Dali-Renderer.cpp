@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 Samsung Electronics Co., Ltd.
+ * Copyright (c) 2019 Samsung Electronics Co., Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -2897,9 +2897,10 @@ int UtcDaliRendererOpacityAnimation(void)
   DALI_TEST_CHECK( value.Get( opacity ) );
   DALI_TEST_EQUALS( opacity, 0.0f, Dali::Math::MACHINE_EPSILON_1, TEST_LOCATION );
 
+  // Need to clear the animation before setting the property as the animation value is baked and will override any previous setters
+  animation.Clear();
   renderer.SetProperty( DevelRenderer::Property::OPACITY, 0.1f );
 
-  animation.Clear();
   animation.AnimateBy( Property( renderer, DevelRenderer::Property::OPACITY ), 0.5f );
   animation.Play();
 
@@ -2909,6 +2910,7 @@ int UtcDaliRendererOpacityAnimation(void)
   value = renderer.GetProperty( DevelRenderer::Property::OPACITY );
   DALI_TEST_CHECK( value.Get( opacity ) );
   DALI_TEST_EQUALS( opacity, 0.6f, Dali::Math::MACHINE_EPSILON_1, TEST_LOCATION );
+  DALI_TEST_EQUALS( opacity, renderer.GetCurrentProperty( DevelRenderer::Property::OPACITY ).Get< float >(), Dali::Math::MACHINE_EPSILON_1, TEST_LOCATION );
 
   END_TEST;
 }
@@ -3004,6 +3006,54 @@ int UtcDaliRendererRenderingBehavior(void)
   updateStatus = application.GetUpdateStatus();
 
   DALI_TEST_CHECK( !( updateStatus & Integration::KeepUpdating::STAGE_KEEP_RENDERING ) );
+
+  END_TEST;
+}
+
+int UtcDaliRendererRegenerateUniformMap(void)
+{
+  TestApplication application;
+
+  tet_infoline( "Test regenerating uniform map when attaching renderer to the node" );
+
+  Geometry geometry = CreateQuadGeometry();
+  Shader shader = Shader::New( "vertexSrc", "fragmentSrc" );
+  Renderer renderer = Renderer::New( geometry, shader );
+
+  Actor actor = Actor::New();
+  actor.AddRenderer( renderer );
+  actor.SetSize( 400, 400 );
+  actor.SetColor( Vector4( 1.0f, 0.0f, 1.0f, 1.0f ) );
+  Stage::GetCurrent().Add( actor );
+
+  application.SendNotification();
+  application.Render();
+
+  actor.RemoveRenderer( renderer );
+  shader = Shader::New( "vertexSrc", "fragmentSrc" );
+  shader.RegisterProperty( "opacity", 0.5f );
+  renderer.SetShader( shader );
+
+  Stage::GetCurrent().KeepRendering( 1.0f );
+
+  // Update for several frames
+  application.SendNotification();
+  application.Render();
+  application.SendNotification();
+  application.Render();
+  application.SendNotification();
+  application.Render();
+  application.SendNotification();
+  application.Render();
+
+  // Add Renderer
+  actor.AddRenderer( renderer );
+  application.SendNotification();
+  application.Render();
+
+  // Nothing to test here, the test must not crash
+  auto updateStatus = application.GetUpdateStatus();
+  DALI_TEST_CHECK( updateStatus & Integration::KeepUpdating::STAGE_KEEP_RENDERING );
 
   END_TEST;
 }
